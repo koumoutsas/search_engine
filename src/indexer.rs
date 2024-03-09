@@ -1,8 +1,6 @@
-use std::thread;
 use crate::crawly::CrawlerBuilder;
-
 use crate::search::SearchResult;
-use crate::search_engine::{Reader, SearchEngine, Writer};
+use crate::search_engine::{Reader, SearchEngine};
 
 pub trait Indexer {
     async fn visit(&self, url: &str, max_depth: u32) -> anyhow::Result<()>;
@@ -28,15 +26,7 @@ impl Indexer for IndexerService {
             .with_max_concurrent_requests(2)
             .with_robots(true)
             .build()?;
-        let url_copy = origin_url.to_string();
-        let t = thread::spawn(move || async move {
-            let r = crawler.start(url_copy).await;
-            r
-        });
-        let results = t.join().unwrap().await?;
-        for result in results {
-            self.search_engine.write(&result.1.0, result.0.as_str(), origin_url, result.1.1 as u32);
-        }
+        crawler.start(origin_url.to_string(), &self.search_engine).await?;
         Ok(())
     }
 }

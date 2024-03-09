@@ -27,6 +27,9 @@ pub struct SearchEngine {
     reader: IndexReader
 }
 
+unsafe impl Send for SearchEngine {}
+unsafe impl Sync for SearchEngine {}
+
 impl Default for SearchEngine {
     fn default() -> Self {
         let index_path = TempDir::new().expect("Unable to create temp dir");

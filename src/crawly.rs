@@ -14,6 +14,7 @@ use std::fmt::Debug;
 use std::str::FromStr;
 use tokio::sync::{RwLock, Semaphore};
 use tokio::time::{sleep, Duration};
+use crate::search_engine::Writer;
 
 const USER_AGENT: &str = "CrawlyRustCrawler";
 
@@ -151,14 +152,15 @@ impl Crawler {
     /// Asynchronously crawls a URL. Honors `robots.txt`, maintains state about visited URLs,
     /// and manages rate limits and concurrency.
     #[async_recursion::async_recursion]
-    #[tracing::instrument(skip(self, semaphore, visited, content))]
+    #[tracing::instrument(skip(self, semaphore, visited, writer))]
     async fn crawl(
         &self,
         semaphore: &Semaphore, // Rate limiting and concurrency management.
+        origin_url: &str,
         url: Url,
         depth: usize,                            // Current depth of the crawl.
         visited: &RwLock<HashSet<Url>>,          // Set of visited URLs to avoid redundancy.
-        content: &RwLock<IndexMap<Url, (String, usize)>>, // Collected content per URL.
+        writer: &(dyn Writer + Send + Sync)
     ) -> Result<()> {
         let permit = semaphore.acquire().await;
         // Recursion base cases.
@@ -280,10 +282,7 @@ impl Crawler {
 
         // Fetch the page content.
         let url_content = String::from_utf8(page)?;
-        content
-            .write()
-            .await
-            .insert(url.clone(), (url_content.clone(), depth));
+        writer.write(&url_content.clone(), &url.clone().to_string(), origin_url, depth as u32);
 
         // Explicitly dropping the permit to free up concurrency slot.
         drop(permit);
@@ -305,7 +304,7 @@ impl Crawler {
                 .filter_map(|link| match url.join(&link) {
                     Ok(url) => {
                         if url.domain().unwrap_or_default() == domain {
-                            Some(self.crawl(semaphore, url, depth + 1, visited, content))
+                            Some(self.crawl(semaphore, origin_url, url, depth + 1, visited, writer))
                         } else {
                             None
                         }
@@ -335,17 +334,16 @@ impl Crawler {
     /// Initiates the crawling process from a specified root URL.
     ///
     /// Returns a map of visited URLs and their corresponding HTML content.
-    #[tracing::instrument(skip(self))]
-    pub async fn start<S: AsRef<str> + Debug>(&self, url: S) -> Result<IndexMap<Url, (String, usize)>> {
+    #[tracing::instrument(skip(self, writer))]
+    pub async fn start<S: AsRef<str> + Debug>(&self, url: S, writer: &(dyn Writer + Send + Sync)) -> Result<()> {
         let root_url = Url::parse(url.as_ref())?;
 
         let semaphore = Semaphore::new(self.config.max_concurrent_requests);
         let visited = RwLock::new(HashSet::new());
-        let content = RwLock::new(IndexMap::new());
 
-        self.crawl(&semaphore, root_url, 0, &visited, &content)
+        self.crawl(&semaphore, &root_url.clone().to_string(), root_url, 0, &visited, writer)
             .await?;
 
-        Ok(content.into_inner())
+        Ok(())
     }
 }
