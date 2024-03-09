@@ -17,6 +17,8 @@ pub trait Reader {
 }
 
 pub struct SearchEngine {
+    // Needed to prevent its destructor from removing the folder
+    index_path: TempDir,
     index: Index,
     index_writer: Mutex<IndexWriter>,
     schema: Schema,
@@ -39,6 +41,7 @@ impl Default for SearchEngine {
             .reload_policy(ReloadPolicy::OnCommit)
             .try_into().expect("Unable to create reader");
         Self {
+            index_path,
             index,
             index_writer: Mutex::new(index_writer),
             schema,
@@ -70,8 +73,12 @@ impl Writer for SearchEngine {
     }
 }
 
-fn get_field_value(doc: &Document, field: Field) -> String {
+fn get_text_field_value(doc: &Document, field: Field) -> String {
     doc.get_first(field).unwrap().as_text().unwrap().to_string()
+}
+
+fn get_int_field_value(doc: &Document, field: Field) -> u32 {
+    doc.get_first(field).unwrap().as_u64().unwrap() as u32
 }
 
 impl Reader for SearchEngine {
@@ -93,9 +100,9 @@ impl Reader for SearchEngine {
         Ok(top_docs.iter().map(|(_score, doc_address)| {
             if let Ok(retrieved) = searcher.doc(*doc_address) {
                 Ok(SearchResult{
-                    relevant_url: get_field_value(&retrieved, url_field),
-                    origin_url: get_field_value(&retrieved, origin_url_field),
-                    depth: get_field_value(&retrieved, depth_field).parse::<u32>().unwrap()
+                    relevant_url: get_text_field_value(&retrieved, url_field),
+                    origin_url: get_text_field_value(&retrieved, origin_url_field),
+                    depth: get_int_field_value(&retrieved, depth_field)
                 })
             } else {
                 return Err(())
