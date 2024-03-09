@@ -22,10 +22,6 @@ pub struct SearchService {
     indexer: Box<IndexerService>,
 }
 
-unsafe impl Sync for SearchService {}
-
-unsafe impl Send for SearchService {}
-
 #[tonic::async_trait]
 impl Searcher for SearchService {
     async fn index(&self, request: Request<IndexRequest>) -> Result<Response<IndexResponse>, Status> {
