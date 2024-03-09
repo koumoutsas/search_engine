@@ -109,9 +109,3 @@ impl Reader for SearchEngine {
             }}).filter(|r| r.is_ok()).map(|r| r.unwrap()).collect())
     }
 }
-
-unsafe impl Send for SearchEngine {
-}
-
-unsafe impl Sync for SearchEngine {
-}

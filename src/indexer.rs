@@ -20,8 +20,6 @@ impl Default for IndexerService {
     }
 }
 
-unsafe impl Send for IndexerService {}
-
 impl Indexer for IndexerService {
     async fn visit(&self, origin_url: &str, max_depth: u32) -> anyhow::Result<()> {
         let crawler = CrawlerBuilder::new()
