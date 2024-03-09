@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package search;
+
+service Searcher {
+  rpc Index(IndexRequest) returns (IndexResponse);
+  rpc Search(SearchRequest) returns (SearchResponse);
+}
+
+message IndexRequest {
+  string origin = 1;
+  uint32 k = 2;
+}
+
+message IndexResponse {
+  ResponseStatus status = 1;
+  optional string message = 2;
+}
+
+message SearchRequest {
+  string query = 1;
+}
+
+message SearchResponse {
+  ResponseStatus status = 1;
+  optional string message = 2;
+  repeated SearchResult results = 3;
+}
+
+message SearchResult {
+  string relevant_url = 1;
+  string origin_url = 2;
+  uint32 depth = 3;
+}
+
+enum ResponseStatus {
+  Ok = 0;
+  Error = 1;
+}
