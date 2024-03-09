@@ -20,6 +20,8 @@ pub struct SearchEngine {
     // Needed to prevent its destructor from removing the folder
     index_path: TempDir,
     index: Index,
+    // Wrapping it with a mutex allows IndexWriter to be mutable and used cross-thread.
+    // The underlying implementation is thread-safe, but cargo doesn't know that
     index_writer: Mutex<IndexWriter>,
     schema: Schema,
     reader: IndexReader
