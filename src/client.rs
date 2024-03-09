@@ -9,12 +9,12 @@ mod search {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = SearcherClient::connect("http://[::1]:50051").await?;
-    let origin_url = "https://www.example.com";
+    let origin_url = "https://en.wikipedia.org/";
     handle_index_result(client.index(Request::new(IndexRequest {
         origin: origin_url.to_string(),
-        k: 4,
+        k: 2,
     })).await?, origin_url)?;
-    let query = "example domain";
+    let query = "wiki";
     handle_query_result(client.search(Request::new(SearchRequest {
         query: query.to_string()
     })).await?, query)?;
