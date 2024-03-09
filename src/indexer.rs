@@ -1,18 +1,19 @@
 use std::collections::{HashMap, HashSet};
 
+use anyhow::Result;
 use futures::StreamExt;
 use reqwest::Url;
 use voyager::{Collector, Crawler, CrawlerConfig, Response, Scraper};
 use voyager::scraper::Selector;
-use crate::search::SearchResult;
 
+use crate::search::SearchResult;
 use crate::search_engine::{Reader, SearchEngine, Writer};
 
 pub trait Indexer {
     async fn visit(&self, url: &str, max_depth: u32) -> Result<String, String>;
 }
 
-pub struct Explorer {
+struct Explorer {
     /// visited urls mapped with all the urls that link to that url
     visited: HashMap<Url, HashSet<Url>>,
     link_selector: Selector,
@@ -34,7 +35,7 @@ impl Scraper for Explorer {
         &mut self,
         mut response: Response<Self::State>,
         crawler: &mut Crawler<Self>,
-    ) -> anyhow::Result<Option<Self::Output>> {
+    ) -> Result<Option<Self::Output>> {
         if let Some(origin) = response.state.take() {
             self.visited
                 .entry(response.response_url.clone())
@@ -53,7 +54,6 @@ impl Scraper for Explorer {
         Ok(Some((response.depth, response.response_url, response.text)))
     }
 }
-
 pub struct IndexerService {
     search_engine: SearchEngine,
 }
@@ -76,7 +76,7 @@ impl Indexer for IndexerService {
             .max_concurrent_requests(1_000);
         let mut collector = Collector::new(Explorer::default(), config);
         collector.crawler_mut().visit(origin_url);
-        while let Ok(output) = collector.next().await.ok_or("Something went wrong with the scraper") {
+        while let Some(output) = collector.next().await {
             if let Ok((depth, url, text)) = output {
                 self.search_engine.write(&text, url.as_str(), origin_url, depth as u32)
             }

@@ -2,17 +2,17 @@ use futures::executor::block_on;
 use tonic::{Request, Response, Status};
 use tonic::transport::Server;
 
-use crate::indexer::{Indexer, IndexerService};
-use crate::search::{IndexRequest, IndexResponse, ResponseStatus, SearchRequest, SearchResponse};
-use crate::search::searcher_server::{Searcher, SearcherServer};
-use crate::search_engine::Reader;
+use indexer::{Indexer, IndexerService};
+use search::{IndexRequest, IndexResponse, ResponseStatus, SearchRequest, SearchResponse};
+use search::searcher_server::{Searcher, SearcherServer};
+use search_engine::Reader;
 
-mod search;
 mod indexer;
 mod search_engine;
 mod client;
-pub mod crawler {
-    tonic::include_proto!("search");
+
+mod search {
+    include!("search.rs");
 }
 
 pub struct SearchService {
@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let service = SearchService {
         indexer: Box::new(IndexerService::default())
     };
-    println!("Crawler service listening on {}", addr);
+    println!("Search engine service listening on {}", addr);
     Server::builder()
         .add_service(SearcherServer::new(service))
         .serve(addr)
