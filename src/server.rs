@@ -1,6 +1,8 @@
-use futures::executor::block_on;
 use tonic::{Request, Response, Status};
 use tonic::transport::Server;
+use tracing_subscriber::{filter, Layer};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 use indexer::{Indexer, IndexerService};
 use search::{IndexRequest, IndexResponse, ResponseStatus, SearchRequest, SearchResponse};
@@ -10,6 +12,7 @@ use search_engine::Reader;
 mod indexer;
 mod search_engine;
 mod client;
+mod crawly;
 
 mod search {
     include!("search.rs");
@@ -29,12 +32,12 @@ impl Searcher for SearchService {
         let index_request = request.get_ref();
         let origin = &index_request.origin;
         let depth = &index_request.k;
-        match block_on(self.indexer.visit(origin, *depth)) {
-            Ok(_) => Ok(Response::new(IndexResponse {
+        match self.indexer.visit(origin, *depth).await {
+            Ok(()) => Ok(Response::new(IndexResponse {
                 status: ResponseStatus::Ok.into(),
                 message: None
             })),
-            Err(message) => Err(Status::aborted(message))
+            Err(error) => Err(Status::aborted(error.to_string()))
         }
     }
 
@@ -53,6 +56,10 @@ impl Searcher for SearchService {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let stdout_log = tracing_subscriber::fmt::layer().pretty();
+    tracing_subscriber::registry()
+        .with(stdout_log.with_filter(filter::LevelFilter::INFO))
+        .init();
     let addr = "[::1]:50051".parse().unwrap();
     let service = SearchService {
         indexer: Box::new(IndexerService::default())
